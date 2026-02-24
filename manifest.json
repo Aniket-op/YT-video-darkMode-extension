@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube WebGL Dark Filter",
+  "version": "2.0.0",
+  "description": "Real-time WebGL filter for YouTube: converts near-white pixels to black and darkens all others. Adjustable threshold and darkness via UI panel.",
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*", "*://www.youtube-nocookie.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "host_permissions": [
+    "*://www.youtube.com/*",
+    "*://www.youtube-nocookie.com/*"
+  ],
+  "permissions": [],
+  "action": {
+    "default_title": "YouTube WebGL Dark Filter"
+  }
+}
