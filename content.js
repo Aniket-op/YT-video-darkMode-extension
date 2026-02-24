@@ -116,10 +116,17 @@ void main() {
     };
   }
 
+  // ✅ FIX 1: resize now tracks video's real position on the page
   function resize() {
-    const w = video.clientWidth;
-    const h = video.clientHeight;
+    const rect = video.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
     if (!w || !h) return;
+
+    canvasGL.style.left = rect.left + window.scrollX + "px";
+    canvasGL.style.top = rect.top + window.scrollY + "px";
+    canvasGL.style.width = w + "px";
+    canvasGL.style.height = h + "px";
 
     canvasGL.width = w;
     canvasGL.height = h;
@@ -158,11 +165,23 @@ void main() {
 
   function createSlider(label, key, min, max, step) {
     const wrapper = document.createElement("div");
-    wrapper.style.marginBottom = "8px";
+    wrapper.style.marginBottom = "10px";
 
-    const lbl = document.createElement("div");
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.justifyContent = "space-between";
+    row.style.fontSize = "11px";
+    row.style.marginBottom = "3px";
+
+    const lbl = document.createElement("span");
     lbl.textContent = label;
-    lbl.style.fontSize = "11px";
+
+    const val = document.createElement("span");
+    val.style.color = "#aaa";
+    val.textContent = parseFloat(state[key]).toFixed(2);
+
+    row.appendChild(lbl);
+    row.appendChild(val);
 
     const input = document.createElement("input");
     input.type = "range";
@@ -171,43 +190,80 @@ void main() {
     input.step = step;
     input.value = state[key];
     input.style.width = "100%";
+    input.style.cursor = "pointer";
+    input.style.accentColor = "#f00";
 
     input.oninput = () => {
       state[key] = parseFloat(input.value);
+      val.textContent = parseFloat(input.value).toFixed(2);
     };
 
-    wrapper.appendChild(lbl);
+    wrapper.appendChild(row);
     wrapper.appendChild(input);
     return wrapper;
   }
 
   function createUI() {
     const panel = document.createElement("div");
-    panel.style.position = "fixed";
-    panel.style.top = "80px";
-    panel.style.right = "20px";
-    panel.style.zIndex = "10000";
-    panel.style.background = "#111";
-    panel.style.color = "#fff";
-    panel.style.padding = "12px";
-    panel.style.borderRadius = "10px";
-    panel.style.fontFamily = "monospace";
-    panel.style.width = "240px";
-    panel.style.maxHeight = "80vh";
-    panel.style.overflowY = "auto";
+    panel.id = "__yt_filter_panel__";
+    panel.style.cssText = `
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      z-index: 99999;
+      background: #1a1a1a;
+      color: #fff;
+      padding: 14px;
+      border-radius: 12px;
+      font-family: monospace;
+      font-size: 12px;
+      width: 250px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+      border: 1px solid #333;
+      user-select: none;
+    `;
+
+    // Header
+    const header = document.createElement("div");
+    header.style.cssText =
+      "display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; cursor:grab;";
+
+    const title = document.createElement("span");
+    title.textContent = "🎨 YT Filter";
+    title.style.fontWeight = "bold";
 
     const toggle = document.createElement("button");
-    toggle.textContent = "Filter ON";
-    toggle.style.width = "100%";
-    toggle.style.marginBottom = "10px";
+    toggle.textContent = "ON";
+    toggle.style.cssText = `
+      background: #c00;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 3px 10px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 12px;
+    `;
     toggle.onclick = () => {
       state.enabled = !state.enabled;
-      toggle.textContent = state.enabled ? "Filter ON" : "Filter OFF";
+      toggle.textContent = state.enabled ? "ON" : "OFF";
+      toggle.style.background = state.enabled ? "#c00" : "#444";
       canvasGL.style.display = state.enabled ? "block" : "none";
     };
 
-    panel.appendChild(toggle);
+    header.appendChild(title);
+    header.appendChild(toggle);
+    panel.appendChild(header);
 
+    // Divider
+    const hr = document.createElement("hr");
+    hr.style.cssText =
+      "border:none; border-top:1px solid #333; margin-bottom:12px;";
+    panel.appendChild(hr);
+
+    // Sliders
     panel.appendChild(
       createSlider("White Threshold", "threshold", 0.5, 1.0, 0.01),
     );
@@ -224,6 +280,84 @@ void main() {
       createSlider("Shadow Lift", "shadowLift", 0.0, 0.2, 0.01),
     );
 
+    // Reset button
+    const resetBtn = document.createElement("button");
+    resetBtn.textContent = "Reset Defaults";
+    resetBtn.style.cssText = `
+      width: 100%;
+      margin-top: 10px;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 11px;
+    `;
+    const defaults = {
+      threshold: 0.9,
+      darkness: 0.7,
+      softness: 0.12,
+      brightness: 0.0,
+      contrast: 1.1,
+      saturation: 1.0,
+      gamma: 0.95,
+      blueReduce: 0.2,
+      shadowLift: 0.05,
+    };
+    resetBtn.onclick = () => {
+      Object.assign(state, defaults);
+      panel.querySelectorAll("input[type=range]").forEach((input) => {
+        const key = input.dataset.key;
+        if (key) {
+          input.value = state[key];
+          const valSpan =
+            input.previousSibling &&
+            input.previousSibling.querySelector("span:last-child");
+          if (valSpan) valSpan.textContent = parseFloat(state[key]).toFixed(2);
+        }
+      });
+    };
+    panel.appendChild(resetBtn);
+
+    // Store key on each input for reset
+    panel.querySelectorAll("input[type=range]").forEach((input, i) => {
+      const keys = [
+        "threshold",
+        "darkness",
+        "softness",
+        "brightness",
+        "contrast",
+        "saturation",
+        "gamma",
+        "blueReduce",
+        "shadowLift",
+      ];
+      input.dataset.key = keys[i];
+    });
+
+    // Draggable
+    let dragging = false,
+      ox = 0,
+      oy = 0;
+    header.onmousedown = (e) => {
+      dragging = true;
+      ox = e.clientX - panel.getBoundingClientRect().left;
+      oy = e.clientY - panel.getBoundingClientRect().top;
+      header.style.cursor = "grabbing";
+    };
+    document.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      panel.style.right = "auto";
+      panel.style.left = e.clientX - ox + "px";
+      panel.style.top = e.clientY - oy + "px";
+    });
+    document.addEventListener("mouseup", () => {
+      dragging = false;
+      header.style.cursor = "grab";
+    });
+
     document.body.appendChild(panel);
   }
 
@@ -232,24 +366,17 @@ void main() {
   function inject(v) {
     video = v;
 
-    const player = document.querySelector(".html5-video-player");
-    if (!player) return;
-
-    player.style.position = "relative";
-
     canvas2D = document.createElement("canvas");
     ctx2D = canvas2D.getContext("2d");
 
+    // ✅ FIX 2: append to body instead of inside the player
+    // so YouTube's settings/controls are never blocked
     canvasGL = document.createElement("canvas");
     canvasGL.style.position = "absolute";
-    canvasGL.style.top = "0";
-    canvasGL.style.left = "0";
-    canvasGL.style.width = "100%";
-    canvasGL.style.height = "100%";
     canvasGL.style.pointerEvents = "none";
-    canvasGL.style.zIndex = "9999";
+    canvasGL.style.zIndex = "2000";
 
-    player.appendChild(canvasGL);
+    document.body.appendChild(canvasGL); // ← was: player.appendChild(canvasGL)
 
     gl = canvasGL.getContext("webgl");
     if (!gl) return;
